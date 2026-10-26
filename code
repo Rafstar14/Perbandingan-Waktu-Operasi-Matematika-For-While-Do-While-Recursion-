@@ -1,0 +1,162 @@
+#include <iostream>
+#include <chrono>
+#include <iomanip>
+#include <string>
+using namespace std;
+using namespace chrono;
+
+using ll = long long;
+
+const ll N = 10'000'000; // 10 Juta kali perhitungan
+
+// Mencegah compiler menghapus perhitungan (Dead Code Elimination)
+volatile double hasilAkhir = 0.0;
+
+enum class Operasi {
+    Tambah, Kurang, Kali, Bagi
+};
+
+// Operasi matematika
+template <Operasi op>
+inline double hitung(double x) {
+    if constexpr (op == Operasi::Tambah)
+        return x + 1.0;
+    else if constexpr (op == Operasi::Kurang)
+        return x - 1.0;
+    else if constexpr (op == Operasi::Kali)
+        return x * 1.0000001;
+    else
+        return x / 1.0000001;
+}
+
+// 1. FOR (100% Murni hanya menggunakan for)
+template <Operasi op>
+double pakaiFor(ll n) {
+    double hasil = 100.0;
+
+    for (ll i = 0; i < n; i++)
+        hasil = hitung<op>(hasil);
+
+    return hasil;
+}
+
+// 2. WHILE (100% Murni hanya menggunakan while)
+template <Operasi op>
+double pakaiWhile(ll n) {
+    double hasil = 100.0;
+    ll i = 0;
+
+    while (i < n) {
+        hasil = hitung<op>(hasil);
+        i++;
+    }
+
+    return hasil;
+}
+
+// 3. DO WHILE (100% Murni hanya menggunakan do-while)
+template <Operasi op>
+double pakaiDoWhile(ll n) {
+    double hasil = 100.0;
+    ll i = 0;
+
+    if (n <= 0)
+        return hasil;
+
+    do {
+        hasil = hitung<op>(hasil);
+        i++;
+    } while (i < n);
+
+    return hasil;
+}
+
+// 4. RECURSION (100% Murni hanya menggunakan rekursi, TANPA for/while sama sekali)
+// Menggunakan metode Divide & Conquer (Pohon Biner) agar:
+// - Tidak ada for / while sedikit pun
+// - Operasi hitung<op>() dieksekusi tepat 10.000.000 kali melalui pemanggilan rekursif
+// - Kedalaman stack maksimum hanya ~24 tumpukan (log2 dari 10.000.000) sehingga bebas Stack Overflow
+#pragma GCC optimize("no-optimize-sibling-calls")
+template <Operasi op>
+double rekursiMurni(double hasil, ll sisa) {
+    if (sisa <= 0)
+        return hasil;
+    if (sisa == 1)
+        return hitung<op>(hasil);
+
+    ll separuh = sisa / 2;
+    hasil = rekursiMurni<op>(hasil, separuh);
+    return rekursiMurni<op>(hasil, sisa - separuh);
+}
+
+template <Operasi op>
+double pakaiRecursion(ll n) {
+    return rekursiMurni<op>(100.0, n);
+}
+
+// Mengukur waktu eksekusi
+template <typename Fungsi>
+double ukurWaktu(Fungsi fungsi) {
+    auto mulai = steady_clock::now();
+    double hasil = fungsi();
+    auto selesai = steady_clock::now();
+
+    hasilAkhir = hasil;
+
+    return duration<double, milli>(selesai - mulai).count();
+}
+
+// Menampilkan hasil pengujian
+template <Operasi op>
+void tampilkanHasil(const string& namaOperasi) {
+    // Pemanasan (warm-up) agar frekuensi CPU adil sejak metode pertama
+    hasilAkhir = pakaiFor<op>(100000);
+
+    cout << "\n===== " << namaOperasi << " (" << N << " kali) =====\n";
+    cout << left << setw(15) << "Metode"
+         << right << setw(15) << "Waktu (ms)"
+         << right << setw(22) << "Hasil Akhir" << '\n';
+    cout << "----------------------------------------------------\n";
+
+    cout << fixed << setprecision(3);
+
+    double tFor = ukurWaktu([] { return pakaiFor<op>(N); });
+    double rFor = hasilAkhir;
+    cout << left << setw(15) << "1. For"
+         << right << setw(15) << tFor
+         << right << setw(22) << rFor << '\n';
+
+    double tWhile = ukurWaktu([] { return pakaiWhile<op>(N); });
+    double rWhile = hasilAkhir;
+    cout << left << setw(15) << "2. While"
+         << right << setw(15) << tWhile
+         << right << setw(22) << rWhile << '\n';
+
+    double tDoWhile = ukurWaktu([] { return pakaiDoWhile<op>(N); });
+    double rDoWhile = hasilAkhir;
+    cout << left << setw(15) << "3. Do While"
+         << right << setw(15) << tDoWhile
+         << right << setw(22) << rDoWhile << '\n';
+
+    double tRec = ukurWaktu([] { return pakaiRecursion<op>(N); });
+    double rRec = hasilAkhir;
+    cout << left << setw(15) << "4. Recursion"
+         << right << setw(15) << tRec
+         << right << setw(22) << rRec << '\n';
+}
+
+int main() {
+    cout << "====================================================\n";
+    cout << " BENCHMARK MURNI 100% OPERASI MATEMATIKA C++\n";
+    cout << " Jumlah operasi: 10.000.000 kali per metode\n";
+    cout << "====================================================\n";
+
+    tampilkanHasil<Operasi::Tambah>("Penjumlahan (+)");
+    tampilkanHasil<Operasi::Kurang>("Pengurangan (-)");
+    tampilkanHasil<Operasi::Kali>("Perkalian (*)");
+    tampilkanHasil<Operasi::Bagi>("Pembagian (/)");
+
+    cout << "\nPengujian selesai.\n";
+
+    return 0;
+}
